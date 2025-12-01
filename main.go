@@ -9,5 +9,6 @@ func main() {
 		Addr:    ":8080",
 	}
 
+	serveMux.Handle("/", http.FileServer(http.Dir("/home/josh/Documents/repos/github.com/joshckidd/chirpy")))
 	server.ListenAndServe()
 }
