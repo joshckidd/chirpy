@@ -11,7 +11,7 @@ type apiConfig struct {
 
 func main() {
 	serveMux := http.NewServeMux()
-	serveMux.HandleFunc("GET /healthz", readinessEndpoint)
+	serveMux.HandleFunc("GET /api/healthz", readinessEndpoint)
 	server := http.Server{
 		Handler: serveMux,
 		Addr:    ":8080",
@@ -19,7 +19,7 @@ func main() {
 
 	var apiCfg apiConfig
 	serveMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("/home/josh/Documents/repos/github.com/joshckidd/chirpy")))))
-	serveMux.HandleFunc("GET /metrics", apiCfg.returnMetrics)
-	serveMux.HandleFunc("POST /reset", apiCfg.resetMetrics)
+	serveMux.HandleFunc("GET /api/metrics", apiCfg.returnMetrics)
+	serveMux.HandleFunc("POST /api/reset", apiCfg.resetMetrics)
 	server.ListenAndServe()
 }
