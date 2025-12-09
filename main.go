@@ -19,7 +19,7 @@ func main() {
 
 	var apiCfg apiConfig
 	serveMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("/home/josh/Documents/repos/github.com/joshckidd/chirpy")))))
-	serveMux.HandleFunc("GET /api/metrics", apiCfg.returnMetrics)
-	serveMux.HandleFunc("POST /api/reset", apiCfg.resetMetrics)
+	serveMux.HandleFunc("GET /admin/metrics", apiCfg.returnMetrics)
+	serveMux.HandleFunc("POST /admin/reset", apiCfg.resetMetrics)
 	server.ListenAndServe()
 }
