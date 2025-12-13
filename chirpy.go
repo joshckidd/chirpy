@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 func readinessEndpoint(w http.ResponseWriter, _ *http.Request) {
@@ -42,68 +43,79 @@ func validateChirp(w http.ResponseWriter, r *http.Request) {
 		Body string `json:"body"`
 	}
 
-	type returnError struct {
-		Error string `json:"error"`
-	}
-
 	type returnValid struct {
-		Valid bool `json:"valid"`
-	}
-
-	respGenError := returnError{
-		Error: "Something went wrong",
-	}
-
-	dat, err := json.Marshal(respGenError)
-	if err != nil {
-		w.WriteHeader(500)
-		return
+		Valid       bool   `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	c := chirp{}
-	err = decoder.Decode(&c)
+	err := decoder.Decode(&c)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		w.Write(dat)
+		respondWithError(w, 500, "Something went wrong")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if len(c.Body) > 140 {
-		respError := returnError{
-			Error: "Chirp is too long",
-		}
-
-		long, err := json.Marshal(respError)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(500)
-			w.Write(dat)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(400)
-		w.Write(long)
+		respondWithError(w, 400, "Chirp is too long")
 		return
 	} else {
-		respError := returnValid{
-			Valid: true,
+		resp := returnValid{
+			Valid:       true,
+			CleanedBody: cleanChirp(c.Body),
 		}
 
-		val, err := json.Marshal(respError)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(500)
-			w.Write(dat)
-			return
-		}
+		respondWithJSON(w, 200, resp)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		w.Write(val)
 		return
 	}
+}
+
+func respondWithError(w http.ResponseWriter, code int, msg string) {
+	type returnError struct {
+		Error string `json:"error"`
+	}
+
+	respError := returnError{
+		Error: msg,
+	}
+
+	dat, err := json.Marshal(respError)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	w.Write(dat)
+}
+
+func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+	val, err := json.Marshal(payload)
+	if err != nil {
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	w.Write(val)
+}
+
+func cleanChirp(c string) string {
+	words := strings.Split(c, " ")
+
+	for i := range words {
+		if strings.ToLower(words[i]) == "kerfuffle" ||
+			strings.ToLower(words[i]) == "sharbert" ||
+			strings.ToLower(words[i]) == "fornax" {
+			words[i] = "****"
+		}
+	}
+
+	res := strings.Join(words, " ")
+
+	return res
 }
