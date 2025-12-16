@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func readinessEndpoint(w http.ResponseWriter, _ *http.Request) {
@@ -31,11 +34,12 @@ func (cfg *apiConfig) returnMetrics(w http.ResponseWriter, _ *http.Request) {
 </html>`, cfg.fileserverHits.Load())))
 }
 
-func (cfg *apiConfig) resetMetrics(w http.ResponseWriter, _ *http.Request) {
+func (cfg *apiConfig) resetMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(200)
 	w.Write([]byte("OK"))
 	cfg.fileserverHits.Store(0)
+	cfg.db.ResetUsers(r.Context())
 }
 
 func validateChirp(w http.ResponseWriter, r *http.Request) {
@@ -52,11 +56,10 @@ func validateChirp(w http.ResponseWriter, r *http.Request) {
 	c := chirp{}
 	err := decoder.Decode(&c)
 	if err != nil {
-		respondWithError(w, 500, "Something went wrong")
+		respondWithError(w, 500, "Invalid request")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if len(c.Body) > 140 {
 		respondWithError(w, 400, "Chirp is too long")
 		return
@@ -70,6 +73,38 @@ func validateChirp(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+}
+
+func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
+	type emailParam struct {
+		Email string `json:"email"`
+	}
+
+	type returnUser struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Email     string    `json:"email"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := emailParam{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, 500, "Invalid request")
+		return
+	}
+
+	user, err := cfg.db.CreateUser(r.Context(), params.Email)
+
+	resp := returnUser{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email,
+	}
+
+	respondWithJSON(w, 201, resp)
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
