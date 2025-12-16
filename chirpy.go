@@ -35,6 +35,11 @@ func (cfg *apiConfig) returnMetrics(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (cfg *apiConfig) resetMetrics(w http.ResponseWriter, r *http.Request) {
+	if cfg.environment == "dev" {
+		w.WriteHeader(403)
+		return
+	}
+
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(200)
 	w.Write([]byte("OK"))

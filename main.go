@@ -15,6 +15,7 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
+	environment    string
 }
 
 func main() {
@@ -37,6 +38,7 @@ func main() {
 
 	var apiCfg apiConfig
 	apiCfg.db = dbQueries
+	apiCfg.environment = os.Getenv("PLATFORM")
 	serveMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("/home/josh/Documents/repos/github.com/joshckidd/chirpy")))))
 	serveMux.HandleFunc("GET /admin/metrics", apiCfg.returnMetrics)
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.resetMetrics)
