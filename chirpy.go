@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/joshckidd/chirpy/internal/database"
 )
 
 func readinessEndpoint(w http.ResponseWriter, _ *http.Request) {
@@ -47,39 +48,6 @@ func (cfg *apiConfig) resetMetrics(w http.ResponseWriter, r *http.Request) {
 	cfg.db.ResetUsers(r.Context())
 }
 
-func validateChirp(w http.ResponseWriter, r *http.Request) {
-	type chirp struct {
-		Body string `json:"body"`
-	}
-
-	type returnValid struct {
-		Valid       bool   `json:"valid"`
-		CleanedBody string `json:"cleaned_body"`
-	}
-
-	decoder := json.NewDecoder(r.Body)
-	c := chirp{}
-	err := decoder.Decode(&c)
-	if err != nil {
-		respondWithError(w, 500, "Invalid request")
-		return
-	}
-
-	if len(c.Body) > 140 {
-		respondWithError(w, 400, "Chirp is too long")
-		return
-	} else {
-		resp := returnValid{
-			Valid:       true,
-			CleanedBody: cleanChirp(c.Body),
-		}
-
-		respondWithJSON(w, 200, resp)
-
-		return
-	}
-}
-
 func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 	type emailParam struct {
 		Email string `json:"email"`
@@ -107,6 +75,51 @@ func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
+	}
+
+	respondWithJSON(w, 201, resp)
+}
+
+func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
+	type chirpParam struct {
+		Body   string    `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
+	}
+
+	type returnChirp struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Body      string    `json:"body"`
+		UserID    uuid.UUID `json:"user_id"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := chirpParam{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, 500, "Invalid request")
+		return
+	}
+
+	if len(params.Body) > 140 {
+		respondWithError(w, 400, "Chirp is too long")
+		return
+	}
+
+	createParams := database.CreateChirpParams{
+		Body:   cleanChirp(params.Body),
+		UserID: params.UserID,
+	}
+
+	chirp, err := cfg.db.CreateChirp(r.Context(), createParams)
+
+	resp := returnChirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
 	}
 
 	respondWithJSON(w, 201, resp)
