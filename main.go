@@ -44,5 +44,6 @@ func main() {
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.resetMetrics)
 	serveMux.HandleFunc("POST /api/users", apiCfg.postUser)
 	serveMux.HandleFunc("POST /api/chirps", apiCfg.postChirp)
+	serveMux.HandleFunc("GET /api/chirps", apiCfg.getChirps)
 	server.ListenAndServe()
 }

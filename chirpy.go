@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/joshckidd/chirpy/internal/database"
@@ -53,13 +52,6 @@ func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 	}
 
-	type returnUser struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
-	}
-
 	decoder := json.NewDecoder(r.Body)
 	params := emailParam{}
 	err := decoder.Decode(&params)
@@ -70,28 +62,13 @@ func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 
 	user, err := cfg.db.CreateUser(r.Context(), params.Email)
 
-	resp := returnUser{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-	}
-
-	respondWithJSON(w, 201, resp)
+	respondWithJSON(w, 201, user)
 }
 
 func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 	type chirpParam struct {
 		Body   string    `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
-	}
-
-	type returnChirp struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserID    uuid.UUID `json:"user_id"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -114,15 +91,17 @@ func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 
 	chirp, err := cfg.db.CreateChirp(r.Context(), createParams)
 
-	resp := returnChirp{
-		ID:        chirp.ID,
-		CreatedAt: chirp.CreatedAt,
-		UpdatedAt: chirp.UpdatedAt,
-		Body:      chirp.Body,
-		UserID:    chirp.UserID,
+	respondWithJSON(w, 201, chirp)
+}
+
+func (cfg *apiConfig) getChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := cfg.db.GetAllChirps(r.Context())
+	if err != nil {
+		respondWithError(w, 500, "Server error")
+		return
 	}
 
-	respondWithJSON(w, 201, resp)
+	respondWithJSON(w, 200, chirps)
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
