@@ -97,11 +97,26 @@ func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) getChirps(w http.ResponseWriter, r *http.Request) {
 	chirps, err := cfg.db.GetAllChirps(r.Context())
 	if err != nil {
-		respondWithError(w, 500, "Server error")
+		respondWithError(w, 500, err.Error())
 		return
 	}
 
 	respondWithJSON(w, 200, chirps)
+}
+
+func (cfg *apiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+	chirp, err := cfg.db.GetChirp(r.Context(), id)
+	if err != nil {
+		respondWithError(w, 404, "Chirp not found")
+		return
+	}
+
+	respondWithJSON(w, 200, chirp)
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
