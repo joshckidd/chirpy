@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/joshckidd/chirpy/internal/auth"
 	"github.com/joshckidd/chirpy/internal/database"
 )
 
@@ -48,19 +49,32 @@ func (cfg *apiConfig) resetMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
-	type emailParam struct {
-		Email string `json:"email"`
+	type userParam struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
-	params := emailParam{}
-	err := decoder.Decode(&params)
+	inParams := userParam{}
+
+	err := decoder.Decode(&inParams)
 	if err != nil {
 		respondWithError(w, 500, "Invalid request")
 		return
 	}
 
-	user, err := cfg.db.CreateUser(r.Context(), params.Email)
+	hashedPassword, err := auth.HashPassword(inParams.Password)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	params := database.CreateUserParams{
+		Email:          inParams.Email,
+		HashedPassword: hashedPassword,
+	}
+
+	user, err := cfg.db.CreateUser(r.Context(), params)
 
 	respondWithJSON(w, 201, user)
 }
@@ -117,6 +131,36 @@ func (cfg *apiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, 200, chirp)
+}
+
+func (cfg *apiConfig) userLogin(w http.ResponseWriter, r *http.Request) {
+	type loginParam struct {
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := loginParam{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, 500, "Invalid request")
+		return
+	}
+
+	user, err := cfg.db.GetUserWithEmail(r.Context(), params.Email)
+
+	val, err := auth.CheckPasswordHash(params.Password, user.HashedPassword)
+	if val == true {
+		userResp := database.CreateUserRow{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		}
+		respondWithJSON(w, 200, userResp)
+		return
+	}
+	respondWithError(w, 401, "Incorrect email or password")
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
