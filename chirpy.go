@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/joshckidd/chirpy/internal/auth"
@@ -81,13 +82,24 @@ func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 	type chirpParam struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
+	}
+
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	id, err := auth.ValidateJWT(tokenString, cfg.tokenSecret)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	params := chirpParam{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, 500, "Invalid request")
 		return
@@ -100,7 +112,7 @@ func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 
 	createParams := database.CreateChirpParams{
 		Body:   cleanChirp(params.Body),
-		UserID: params.UserID,
+		UserID: id,
 	}
 
 	chirp, err := cfg.db.CreateChirp(r.Context(), createParams)
@@ -135,8 +147,17 @@ func (cfg *apiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) userLogin(w http.ResponseWriter, r *http.Request) {
 	type loginParam struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password         string `json:"password"`
+		Email            string `json:"email"`
+		ExpiresInSeconds int    `json:"expires_in_seconds"`
+	}
+
+	type returnUserRow struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Email     string    `json:"email"`
+		Token     string    `json:"token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -147,15 +168,32 @@ func (cfg *apiConfig) userLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var exp time.Duration
+	if params.ExpiresInSeconds == 0 || params.ExpiresInSeconds > 3600 {
+		exp = time.Hour
+	} else {
+		exp = time.Second * time.Duration(params.ExpiresInSeconds)
+	}
+
 	user, err := cfg.db.GetUserWithEmail(r.Context(), params.Email)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+	tok, err := auth.MakeJWT(user.ID, cfg.tokenSecret, exp)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
 
 	val, err := auth.CheckPasswordHash(params.Password, user.HashedPassword)
 	if val == true {
-		userResp := database.CreateUserRow{
+		userResp := returnUserRow{
 			ID:        user.ID,
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
 			Email:     user.Email,
+			Token:     tok,
 		}
 		respondWithJSON(w, 200, userResp)
 		return
