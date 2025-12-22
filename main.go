@@ -49,5 +49,7 @@ func main() {
 	serveMux.HandleFunc("GET /api/chirps", apiCfg.getChirps)
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.getChirp)
 	serveMux.HandleFunc("POST /api/login", apiCfg.userLogin)
+	serveMux.HandleFunc("POST /api/refresh", apiCfg.refreshJWT)
+	serveMux.HandleFunc("POST /api/revoke", apiCfg.revokeToken)
 	server.ListenAndServe()
 }
