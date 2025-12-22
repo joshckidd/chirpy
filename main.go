@@ -53,5 +53,6 @@ func main() {
 	serveMux.HandleFunc("POST /api/revoke", apiCfg.revokeToken)
 	serveMux.HandleFunc("PUT /api/users", apiCfg.putUser)
 	serveMux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.deleteChirp)
+	serveMux.HandleFunc("POST /api/polka/webhooks", apiCfg.userRed)
 	server.ListenAndServe()
 }

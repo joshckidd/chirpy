@@ -12,6 +12,16 @@ import (
 	"github.com/joshckidd/chirpy/internal/database"
 )
 
+type returnUserRow struct {
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
+}
+
 func readinessEndpoint(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(200)
@@ -55,6 +65,14 @@ func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 
+	type returnUserRow struct {
+		ID          uuid.UUID `json:"id"`
+		CreatedAt   time.Time `json:"created_at"`
+		UpdatedAt   time.Time `json:"updated_at"`
+		Email       string    `json:"email"`
+		IsChirpyRed bool      `json:"is_chirpy_red"`
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	inParams := userParam{}
 
@@ -81,7 +99,13 @@ func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, 201, user)
+	respondWithJSON(w, 201, returnUserRow{
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed.Bool,
+	})
 }
 
 func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
@@ -166,6 +190,7 @@ func (cfg *apiConfig) userLogin(w http.ResponseWriter, r *http.Request) {
 		Email        string    `json:"email"`
 		Token        string    `json:"token"`
 		RefreshToken string    `json:"refresh_token"`
+		IsChirpyRed  bool      `json:"is_chirpy_red"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -205,6 +230,7 @@ func (cfg *apiConfig) userLogin(w http.ResponseWriter, r *http.Request) {
 			Email:        user.Email,
 			Token:        tok,
 			RefreshToken: rt.Token,
+			IsChirpyRed:  user.IsChirpyRed.Bool,
 		}
 		respondWithJSON(w, 200, userResp)
 		return
@@ -332,6 +358,39 @@ func (cfg *apiConfig) deleteChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = cfg.db.DeleteChirp(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, 404, err.Error())
+		return
+	}
+
+	respondWithJSON(w, 204, nil)
+}
+
+func (cfg *apiConfig) userRed(w http.ResponseWriter, r *http.Request) {
+	type dataParams struct {
+		UserID uuid.UUID `json:"user_id"`
+	}
+
+	type redParams struct {
+		Event string     `json:"event"`
+		Data  dataParams `json:"data"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	inParams := redParams{}
+
+	err := decoder.Decode(&inParams)
+	if err != nil {
+		respondWithError(w, 500, "Invalid request")
+		return
+	}
+
+	if inParams.Event != "user.upgraded" {
+		respondWithJSON(w, 204, nil)
+		return
+	}
+
+	err = cfg.db.UpdateUserRed(r.Context(), inParams.Data.UserID)
 	if err != nil {
 		respondWithError(w, 404, err.Error())
 		return
