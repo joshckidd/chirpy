@@ -51,5 +51,6 @@ func main() {
 	serveMux.HandleFunc("POST /api/login", apiCfg.userLogin)
 	serveMux.HandleFunc("POST /api/refresh", apiCfg.refreshJWT)
 	serveMux.HandleFunc("POST /api/revoke", apiCfg.revokeToken)
+	serveMux.HandleFunc("PUT /api/users", apiCfg.putUser)
 	server.ListenAndServe()
 }

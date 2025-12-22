@@ -76,6 +76,10 @@ func (cfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := cfg.db.CreateUser(r.Context(), params)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
 
 	respondWithJSON(w, 201, user)
 }
@@ -116,6 +120,10 @@ func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chirp, err := cfg.db.CreateChirp(r.Context(), createParams)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
 
 	respondWithJSON(w, 201, chirp)
 }
@@ -244,6 +252,54 @@ func (cfg *apiConfig) revokeToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, 204, nil)
+}
+
+func (cfg *apiConfig) putUser(w http.ResponseWriter, r *http.Request) {
+	type userParam struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	id, err := auth.ValidateJWT(tokenString, cfg.tokenSecret)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	inParams := userParam{}
+
+	err = decoder.Decode(&inParams)
+	if err != nil {
+		respondWithError(w, 500, "Invalid request")
+		return
+	}
+
+	hashedPassword, err := auth.HashPassword(inParams.Password)
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	params := database.UpdateUserParams{
+		Email:          inParams.Email,
+		HashedPassword: hashedPassword,
+		ID:             id,
+	}
+
+	user, err := cfg.db.UpdateUser(r.Context(), params)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	respondWithJSON(w, 200, user)
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
