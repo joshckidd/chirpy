@@ -302,6 +302,44 @@ func (cfg *apiConfig) putUser(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, 200, user)
 }
 
+func (cfg *apiConfig) deleteChirp(w http.ResponseWriter, r *http.Request) {
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	id, err := auth.ValidateJWT(tokenString, cfg.tokenSecret)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+		return
+	}
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		respondWithError(w, 500, err.Error())
+		return
+	}
+
+	c, err := cfg.db.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, 404, err.Error())
+		return
+	}
+	if c.UserID != id {
+		respondWithError(w, 403, "Unauthorized user")
+		return
+	}
+
+	err = cfg.db.DeleteChirp(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, 404, err.Error())
+		return
+	}
+
+	respondWithJSON(w, 204, nil)
+}
+
 func respondWithError(w http.ResponseWriter, code int, msg string) {
 	type returnError struct {
 		Error string `json:"error"`
