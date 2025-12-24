@@ -376,10 +376,16 @@ func (cfg *apiConfig) userRed(w http.ResponseWriter, r *http.Request) {
 		Data  dataParams `json:"data"`
 	}
 
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil || apiKey != cfg.polkaKey {
+		respondWithError(w, 401, "Invalid API key")
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	inParams := redParams{}
 
-	err := decoder.Decode(&inParams)
+	err = decoder.Decode(&inParams)
 	if err != nil {
 		respondWithError(w, 500, "Invalid request")
 		return

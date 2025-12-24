@@ -70,3 +70,11 @@ func MakeRefreshToken() (string, error) {
 	rand.Read(key)
 	return hex.EncodeToString(key), nil
 }
+
+func GetAPIKey(headers http.Header) (string, error) {
+	res := strings.Split(headers.Get("Authorization"), " ")
+	if len(res) == 2 {
+		return res[1], nil
+	}
+	return "", errors.New("Invalid authorization string")
+}
