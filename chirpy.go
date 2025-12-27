@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -153,27 +154,33 @@ func (cfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) getChirps(w http.ResponseWriter, r *http.Request) {
-	s := r.URL.Query().Get("author_id")
-	if s != "" {
-		id, err := uuid.Parse(s)
+	var chirps []database.Chirp
+
+	s := r.URL.Query().Get("sort")
+	a := r.URL.Query().Get("author_id")
+	if a != "" {
+		id, err := uuid.Parse(a)
 		if err != nil {
 			respondWithError(w, 500, err.Error())
 			return
 		}
-		chirps, err := cfg.db.GetChirpsForUser(r.Context(), id)
+		chirps, err = cfg.db.GetChirpsForUser(r.Context(), id)
 		if err != nil {
 			respondWithError(w, 500, err.Error())
 			return
 		}
 
-		respondWithJSON(w, 200, chirps)
-		return
+	} else {
+		var err error
+		chirps, err = cfg.db.GetAllChirps(r.Context())
+		if err != nil {
+			respondWithError(w, 500, err.Error())
+			return
+		}
 	}
 
-	chirps, err := cfg.db.GetAllChirps(r.Context())
-	if err != nil {
-		respondWithError(w, 500, err.Error())
-		return
+	if s == "desc" {
+		sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.After(chirps[j].CreatedAt) })
 	}
 
 	respondWithJSON(w, 200, chirps)
